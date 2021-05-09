@@ -1,0 +1,61 @@
+syms Cds Ls gds Cdg Rd Rs Cpd Cpg Rg Lg Ld s
+filepath = 'C:\Users\Ciaran Wilson\Documents\S-Parameter data\26-7-2016\ActiveBias\2\';
+        filenames = dir(filepath);
+        a=size(filenames);
+        filename = zeros(1,a(1));
+        filename = filenames(3).name;
+        wowfile = [filepath filename];
+h = read(rfdata.data, wowfile);
+            freq = h.Freq;
+            samplepoints=h.S_Parameters(1,1,:);
+            samplepointz(:,1) = squeeze(samplepoints);
+            Z11 = s2z(samplepointz);
+            Z11tot = squeeze(Z11(1,1,:));
+            samplepoints2=h.S_parameters(1,2,:);
+            samplepointz2(:,1)=squeeze(samplepoints2);
+            Z12 = s2z(samplepointz2);
+            Z12tot = squeeze(Z12(1,1,:));
+            samplepoints3=h.S_parameters(2,1,:);
+            samplepointz3(:,1)=squeeze(samplepoints3);
+            Z21 = s2z(samplepointz3);
+            samplepoints4=h.S_parameters(2,2,:);
+            samplepointz4(:,1)=squeeze(samplepoints4);
+            Z22 = s2z(samplepointz4);
+a1 = Cds*Ls;
+a2 = gds*Ls +Cdg*Rd + Cds*(Rd+Rs);
+a3 = gds/Cpd;
+a4 = 1/Cpd*(Cdg + Cds + (Cpd*gds)*(Rd + Rs));
+a5 = (Cpg*Cds*Ls)/Cpd;
+a6 = Cpg/Cpd*(gds*Ls - Cdg*Rg + Cds*Rs);
+a7 = 1/Cpd*(Cdg - Cpg*gds*Rs);
+a8 = (Cpg/Cpd)*Cds*Lg*Ls;
+a9 = Lg*a6;
+a10 = Lg*a7 - a5/Cpg;
+a11 = a3*Rs;
+a12 = a6/Cpg;
+a13 = Ld*a1;
+a14 = Ld*a2;
+a15 = a4*Ld + Ld + a5/Cpg;
+a16 = 1/Cpd + a3*(Rd+Rs);
+a17 = a2/Cpd + a3*Ld;
+
+fk = h.Freq;
+fmax = 1.5e10;
+
+fkBar = fk/fmax;
+
+x = [a12 a10 a9 a8 a7 a6 a5 a4 a3 a2 a1 a11];
+Yo = 0.02;
+Zo = 50;
+wo = 2*pi*fmax;
+K = [Yo 0 0 0 0 0 0 0 0 0; 0 Yo*wo 0 0 0 0 0 0 0 0; 0 0 Yo*(wo^2) 0 0 0 0 0 0 0; 0 0 0 1 0 0 0 0 0 0; 0 0 0 0 wo 0 0 0 0 0; 0 0 0 0 0 (wo^2)*1 0 0 0 0; 0 0 0 0 0 0 Yo/wo 0 0 0; 0 0 0 0 0 0 0 wo 0 0; 0 0 0 0 0 0 0 0 wo^2 0; 0 0 0 0 0 0 0 0 0 1/wo];
+Z12 = (-Z11*(a5*(s^2) + a6*s - a7) + a8*(s^3) + a9*(s^2) - a10*s + a11/s + a12)/(a1*(s^2)+a2*s +a3/s + a4 +1);
+Z22 = (-Z22*(a5*(s^2) +a6*s - a7) + a13*(s^3) + a14*(s^2) - a15*s +a16/s + a17)/(a1*(s^2)+a2*s +a3/s + a4 +1);
+for ii = 1:1:length(Z11tot)
+    A11(:,:, ii) = [Zo 0 -Zo*(fkBar(ii))^2 0 real(Z11tot(ii)) imag(Z11tot(ii))*fkBar(ii); 0 Zo*fkBar(ii) 0 -Zo*(fkBar(ii))^3 imag(Z11tot(ii)) -real(Z11tot(ii))];
+    A12(:,:, ii) = [real(Z11tot(ii))*(fkBar(ii))^2 -real(Z12tot(ii)) (-Zo*(imag(Z12tot(ii))))/fkBar(ii) imag(Z12tot(ii))*fkBar(ii) real(Z12tot(ii))*(fkBar(ii))^2 0;imag(Z11tot(ii))*(fkBar(ii))^2 -imag(Z12tot(ii)) (Zo*(real(Z12tot(ii))))/fkBar(ii) -real(Z12tot(ii))*fkBar(ii) imag(Z12tot(ii))*(fkBar(ii))^2 -1/fkBar(ii)];
+    B(:,ii) = [real(Z12tot(ii)); imag(Z12tot(ii))];
+end
+A = [A11 A12];
+% B = [real(Z12tot); imag(Z12tot)];
+[u, o, v] = svd([A;-B]);
